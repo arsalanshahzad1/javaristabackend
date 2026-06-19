@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon",
+    "dev": "DOTENV_CONFIG_OVERRIDE=true nodemon",
     "seed": "ts-node src/config/seed.ts",
     "build": "tsc",
     "start": "node dist/app.js",

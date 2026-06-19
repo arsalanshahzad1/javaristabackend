@@ -1,8 +1,7 @@
+import 'dotenv/config';
 import express, { Application, Request, Response } from 'express';
-import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import dotenv from 'dotenv';
 import { errorMiddleware } from './middleware/error.middleware';
 import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
@@ -15,12 +14,33 @@ import adminRoutes from './routes/admin.routes';
 import connectDB from './config/db';
 import rateLimit from 'express-rate-limit';
 
-dotenv.config();
-
 const app: Application = express();
 
 app.use(helmet());
-app.use(cors({ origin: [process.env.CLIENT_URL || '', process.env.ADMIN_URL || ''], credentials: true }));
+
+const allowedOrigins = new Set(
+  [process.env.CLIENT_URL, process.env.ADMIN_URL].filter((origin): origin is string => Boolean(origin))
+);
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+
+  if (origin && allowedOrigins.has(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+
+  res.header('Vary', 'Origin');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, Origin, X-Requested-With');
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+
+  next();
+});
+
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -46,7 +66,7 @@ app.use('/api/admin', adminRoutes);
 
 app.use(errorMiddleware);
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 connectDB().then(() => {
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
