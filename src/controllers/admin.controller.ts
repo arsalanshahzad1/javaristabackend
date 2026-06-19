@@ -7,6 +7,7 @@ import Bean from '../models/Bean';
 import EspressoShot from '../models/EspressoShot';
 import { successResponse, errorResponse } from '../utils/response';
 import asyncHandler from '../utils/asyncHandler';
+import { serializeRecipeForUi } from '../utils/recipe.mapper';
 
 export const getStats = asyncHandler(async (_req: Request, res: Response) => {
   const [
@@ -137,7 +138,7 @@ export const getAllRecipes = asyncHandler(async (req: Request, res: Response) =>
     Recipe.countDocuments(),
   ]);
 
-  successResponse(res, 'Recipes fetched', recipes, 200, {
+  successResponse(res, 'Recipes fetched', recipes.map((recipe) => serializeRecipeForUi(recipe)), 200, {
     page,
     limit,
     total,
@@ -162,7 +163,11 @@ export const publishRecipe = asyncHandler(async (req: Request, res: Response) =>
     return;
   }
 
-  successResponse(res, 'Recipe updated', recipe);
+  await recipe.populate([
+    { path: 'brewMethod', select: 'name' },
+    { path: 'author', select: 'name' },
+  ]);
+  successResponse(res, 'Recipe updated', serializeRecipeForUi(recipe));
 });
 
 export const deleteRecipe = asyncHandler(async (req: Request, res: Response) => {

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import Recipe from '../models/Recipe';
 import { successResponse, errorResponse } from '../utils/response';
 import asyncHandler from '../utils/asyncHandler';
+import { normalizeRecipeForDb, serializeRecipeForUi } from '../utils/recipe.mapper';
 
 export const getAllRecipes = asyncHandler(async (req: Request, res: Response) => {
   const page = Math.max(1, parseInt(req.query['page'] as string) || 1);
@@ -45,16 +46,20 @@ export const getRecipe = asyncHandler(async (req: Request, res: Response) => {
     errorResponse(res, 'Recipe not found', 404);
     return;
   }
-  successResponse(res, 'Recipe fetched', recipe);
+  successResponse(res, 'Recipe fetched', serializeRecipeForUi(recipe));
 });
 
 export const createRecipe = asyncHandler(async (req: Request, res: Response) => {
   const recipe = await Recipe.create({
-    ...req.body,
+    ...normalizeRecipeForDb(req.body),
     author: req.user!.userId,
     isPublished: false,
   });
-  successResponse(res, 'Recipe created', recipe, 201);
+  const populated = await recipe.populate([
+    { path: 'brewMethod', select: 'name' },
+    { path: 'author', select: 'name avatar' },
+  ]);
+  successResponse(res, 'Recipe created', serializeRecipeForUi(populated), 201);
 });
 
 export const updateRecipe = asyncHandler(async (req: Request, res: Response) => {
@@ -71,11 +76,21 @@ export const updateRecipe = asyncHandler(async (req: Request, res: Response) => 
     return;
   }
 
-  const updated = await Recipe.findByIdAndUpdate(req.params['id'], req.body, {
+  const updated = await Recipe.findByIdAndUpdate(req.params['id'], normalizeRecipeForDb(req.body), {
     new: true,
     runValidators: true,
   });
-  successResponse(res, 'Recipe updated', updated);
+
+  if (!updated) {
+    errorResponse(res, 'Recipe not found', 404);
+    return;
+  }
+
+  await updated.populate([
+    { path: 'brewMethod', select: 'name' },
+    { path: 'author', select: 'name avatar' },
+  ]);
+  successResponse(res, 'Recipe updated', serializeRecipeForUi(updated));
 });
 
 export const deleteRecipe = asyncHandler(async (req: Request, res: Response) => {

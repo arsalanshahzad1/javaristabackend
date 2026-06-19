@@ -10,6 +10,7 @@ interface IStep {
 
 export interface IRecipe extends Document {
   name: string;
+  description?: string;
   brewMethod: Types.ObjectId;
   author: Types.ObjectId;
   coffeeDose: number;
@@ -42,6 +43,7 @@ const StepSchema = new Schema<IStep>(
 const RecipeSchema = new Schema<IRecipe>(
   {
     name: { type: String, required: true },
+    description: { type: String },
     brewMethod: { type: Schema.Types.ObjectId, ref: 'BrewMethod', required: true },
     author: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     coffeeDose: { type: Number, required: true },
