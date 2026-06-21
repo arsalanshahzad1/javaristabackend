@@ -5,6 +5,7 @@ export interface IBrewMethod extends Document {
   slug: string;
   description?: string;
   icon?: string;
+  category: 'coffee' | 'matcha' | 'hojicha';
   difficulty?: 'easy' | 'medium' | 'hard';
   requiredEquipment: string[];
   recommendedGrindSize?: string;
@@ -20,6 +21,7 @@ const BrewMethodSchema = new Schema<IBrewMethod>(
     slug: { type: String, required: true, unique: true, lowercase: true },
     description: { type: String },
     icon: { type: String },
+    category: { type: String, enum: ['coffee', 'matcha', 'hojicha'], default: 'coffee' },
     difficulty: { type: String, enum: ['easy', 'medium', 'hard'] },
     requiredEquipment: [{ type: String }],
     recommendedGrindSize: { type: String },

@@ -4,8 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "DOTENV_CONFIG_OVERRIDE=true nodemon",
+    "dev": "nodemon",
     "seed": "ts-node src/config/seed.ts",
+    "migrate:brew-category": "ts-node src/config/migrate-brew-category.ts",
     "build": "tsc",
     "start": "node dist/app.js",
     "test": "echo \"Error: no test specified\" && exit 1"

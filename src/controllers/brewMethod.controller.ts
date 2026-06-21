@@ -3,8 +3,13 @@ import BrewMethod from '../models/BrewMethod';
 import { successResponse, errorResponse } from '../utils/response';
 import asyncHandler from '../utils/asyncHandler';
 
-export const getAllBrewMethods = asyncHandler(async (_req: Request, res: Response) => {
-  const methods = await BrewMethod.find({ isActive: true }).sort({ name: 1 });
+export const getAllBrewMethods = asyncHandler(async (req: Request, res: Response) => {
+  const { category } = req.query as { category?: string };
+  const filter: Record<string, unknown> = { isActive: true };
+  if (category && ['coffee', 'matcha', 'hojicha'].includes(category)) {
+    filter['category'] = category;
+  }
+  const methods = await BrewMethod.find(filter).sort({ name: 1 });
   successResponse(res, 'Brew methods fetched', methods);
 });
 

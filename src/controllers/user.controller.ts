@@ -16,13 +16,17 @@ export const getProfile = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const updateProfile = asyncHandler(async (req: Request, res: Response) => {
-  const { name, avatar } = req.body;
+  const { name, avatar, bio } = req.body;
 
-  const user = await User.findByIdAndUpdate(
-    req.user!.userId,
-    { name, avatar },
-    { new: true, runValidators: true }
-  );
+  const updates: Record<string, unknown> = {};
+  if (name !== undefined) updates.name = name;
+  if (avatar !== undefined) updates.avatar = avatar;
+  if (bio !== undefined) updates.bio = bio;
+
+  const user = await User.findByIdAndUpdate(req.user!.userId, updates, {
+    new: true,
+    runValidators: true,
+  });
   if (!user) {
     errorResponse(res, 'User not found', 404);
     return;

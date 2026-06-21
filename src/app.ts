@@ -11,6 +11,14 @@ import brewLogRoutes from './routes/brewLog.routes';
 import beanRoutes from './routes/bean.routes';
 import espressoRoutes from './routes/espresso.routes';
 import adminRoutes from './routes/admin.routes';
+import academyRoutes from './routes/academy.routes';
+import certificationRoutes from './routes/certification.routes';
+import playbookRoutes from './routes/playbook.routes';
+import checklistRoutes from './routes/checklist.routes';
+import performanceRoutes from './routes/performance.routes';
+import communityRoutes from './routes/community.routes';
+import investorRoutes from './routes/investor.routes';
+import storeOpsRoutes from './routes/store-ops.routes';
 import connectDB from './config/db';
 import rateLimit from 'express-rate-limit';
 
@@ -63,6 +71,14 @@ app.use('/api/brew-logs', brewLogRoutes);
 app.use('/api/beans', beanRoutes);
 app.use('/api/espresso', espressoRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/academy', academyRoutes);
+app.use('/api/certifications', certificationRoutes);
+app.use('/api/playbooks', playbookRoutes);
+app.use('/api/checklists', checklistRoutes);
+app.use('/api/performance', performanceRoutes);
+app.use('/api/community', communityRoutes);
+app.use('/api/investor', investorRoutes);
+app.use('/api/store-ops', storeOpsRoutes);
 
 app.use(errorMiddleware);
 

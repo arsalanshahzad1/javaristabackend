@@ -6,12 +6,17 @@ export interface IUser extends Document {
   email: string;
   password: string;
   avatar?: string;
-  role: 'user' | 'admin';
+  bio?: string;
+  role: 'community' | 'investor' | 'employee' | 'admin';
   isVerified: boolean;
   isPremium: boolean;
-  subscriptionStatus: 'free' | 'premium' | 'expired';
+  isActive: boolean;
+  deactivatedAt?: Date;
+  subscriptionStatus: 'none' | 'active' | 'expired';
   subscriptionExpiry?: Date;
   refreshToken?: string;
+  followersCount: number;
+  followingCount: number;
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
@@ -21,12 +26,17 @@ const UserSchema = new Schema<IUser>(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true, minlength: 8, select: false },
     avatar: { type: String },
-    role: { type: String, enum: ['user', 'admin'], default: 'user' },
+    bio: { type: String, maxlength: 160 },
+    role: { type: String, enum: ['community', 'investor', 'employee', 'admin'], default: 'community' },
     isVerified: { type: Boolean, default: false },
     isPremium: { type: Boolean, default: false },
-    subscriptionStatus: { type: String, enum: ['free', 'premium', 'expired'], default: 'free' },
+    isActive: { type: Boolean, default: true },
+    deactivatedAt: { type: Date },
+    subscriptionStatus: { type: String, enum: ['none', 'active', 'expired'], default: 'none' },
     subscriptionExpiry: { type: Date },
     refreshToken: { type: String, select: false },
+    followersCount: { type: Number, default: 0 },
+    followingCount: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
