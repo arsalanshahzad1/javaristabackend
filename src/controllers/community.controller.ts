@@ -182,7 +182,15 @@ export const getFeed = asyncHandler(async (req: Request, res: Response) => {
     BrewShare.countDocuments({ user: { $in: followingIds } }),
   ]);
 
-  successResponse(res, 'Feed fetched', shares, 200, {
+  const mapped = shares.map((share) => ({
+    ...share,
+    isLikedByMe: (share.likes as mongoose.Types.ObjectId[]).some(
+      (id) => id.toString() === userId,
+    ),
+    likesCount: share.likesCount,
+  }));
+
+  successResponse(res, 'Feed fetched', mapped, 200, {
     page,
     limit,
     total,
@@ -191,6 +199,7 @@ export const getFeed = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const getExplore = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user?.userId ?? null;
   const page = Math.max(1, parseInt(req.query['page'] as string) || 1);
   const limit = Math.min(50, parseInt(req.query['limit'] as string) || 20);
   const skip = (page - 1) * limit;
@@ -206,7 +215,17 @@ export const getExplore = asyncHandler(async (req: Request, res: Response) => {
     BrewShare.countDocuments(),
   ]);
 
-  successResponse(res, 'Explore fetched', shares, 200, {
+  const mapped = shares.map((share) => ({
+    ...share,
+    isLikedByMe: userId
+      ? (share.likes as mongoose.Types.ObjectId[]).some(
+          (id) => id.toString() === userId,
+        )
+      : false,
+    likesCount: share.likesCount,
+  }));
+
+  successResponse(res, 'Explore fetched', mapped, 200, {
     page,
     limit,
     total,

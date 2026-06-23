@@ -12,12 +12,13 @@ import {
   toggleLike,
 } from '../controllers/community.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
+import { optionalAuth } from '../middleware/optionalAuth.middleware';
 
 const router = Router();
 
 // Public
 router.get('/users/:userId/profile', getPublicProfile);
-router.get('/explore', getExplore);
+router.get('/explore', optionalAuth, getExplore);
 
 // Auth required
 router.post('/follow/:userId', authMiddleware, followUser);
