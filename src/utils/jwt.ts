@@ -1,11 +1,13 @@
 import jwt from 'jsonwebtoken';
+import type { UserRole } from '../models/User';
 
 export interface JwtPayload {
   userId: string;
-  role: string;
+  role: UserRole;
+  storeId?: string;
 }
 
-export const generateAccessToken = (userId: string, role: string): string => {
+export const generateAccessToken = (userId: string, role: UserRole): string => {
   return jwt.sign(
     { userId, role },
     process.env.JWT_SECRET as string,

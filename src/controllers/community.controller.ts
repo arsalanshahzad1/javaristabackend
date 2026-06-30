@@ -5,8 +5,17 @@ import Follow from '../models/follow.model';
 import BrewShare from '../models/brew-share.model';
 import Certification from '../models/certification.model';
 import BrewLog from '../models/BrewLog';
+import CommunityProfile from '../models/CommunityProfile';
 import { successResponse, errorResponse } from '../utils/response';
 import asyncHandler from '../utils/asyncHandler';
+import {
+  getOrCreateProfile,
+  awardPoints,
+  checkAndAwardBadges,
+  POINTS,
+} from '../services/community.service';
+import { BADGE_DEFINITIONS, LEVEL_THRESHOLDS } from '../constants/badges';
+import { createNotification } from '../services/notification.service';
 
 const toOid = (id: string) => new mongoose.Types.ObjectId(id);
 
@@ -28,7 +37,7 @@ export const getPublicProfile = asyncHandler(async (req: Request, res: Response)
     return;
   }
 
-  const [recentShares, certifications] = await Promise.all([
+  const [recentShares, certifications, communityProfile] = await Promise.all([
     BrewShare.find({ user: userId })
       .sort({ createdAt: -1 })
       .limit(5)
@@ -38,9 +47,147 @@ export const getPublicProfile = asyncHandler(async (req: Request, res: Response)
       .select('type issuedAt certificateNumber')
       .sort({ issuedAt: -1 })
       .lean(),
+    CommunityProfile.findOne({ userId }).lean(),
   ]);
 
-  successResponse(res, 'Profile fetched', { user, recentShares, certifications });
+  const profileData = communityProfile
+    ? {
+        level: communityProfile.level,
+        levelPoints: communityProfile.levelPoints,
+        badges: communityProfile.badges,
+        totalBrews: communityProfile.totalBrews,
+        totalLikesReceived: communityProfile.totalLikesReceived,
+        storesVisited: communityProfile.storesVisited,
+        coffeesTriedNames: communityProfile.coffeesTriedNames,
+        brewMethodsLearned: communityProfile.brewMethodsLearned,
+      }
+    : null;
+
+  successResponse(res, 'Profile fetched', {
+    user,
+    recentShares,
+    certifications,
+    communityProfile: profileData,
+  });
+});
+
+// ─── Own Community Profile ────────────────────────────────────────────────────
+
+export const getMyProfile = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
+  const profile = await getOrCreateProfile(userId);
+  successResponse(res, 'Profile fetched', profile);
+});
+
+export const updateMyProfile = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
+  const { favoriteBrewMethod, favoriteOrigin, favoriteTastingNotes } = req.body as {
+    favoriteBrewMethod?: string;
+    favoriteOrigin?: string;
+    favoriteTastingNotes?: string[];
+  };
+
+  const profile = await getOrCreateProfile(userId);
+
+  if (favoriteBrewMethod !== undefined) profile.favoriteBrewMethod = favoriteBrewMethod;
+  if (favoriteOrigin !== undefined) profile.favoriteOrigin = favoriteOrigin;
+  if (Array.isArray(favoriteTastingNotes)) profile.favoriteTastingNotes = favoriteTastingNotes;
+
+  await profile.save();
+  successResponse(res, 'Profile updated', profile);
+});
+
+// ─── Passport ────────────────────────────────────────────────────────────────
+
+export const checkIn = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
+  const { storeId, storeName } = req.body as { storeId: string; storeName: string };
+
+  if (!storeId || !storeName) {
+    errorResponse(res, 'storeId and storeName are required', 400);
+    return;
+  }
+
+  const profile = await getOrCreateProfile(userId);
+  const existing = profile.storesVisited.find((s) => s.storeId === storeId);
+
+  let isFirstVisit = false;
+  if (existing) {
+    existing.checkInCount += 1;
+    existing.visitedAt = new Date();
+  } else {
+    profile.storesVisited.push({
+      storeId,
+      storeName,
+      visitedAt: new Date(),
+      checkInCount: 1,
+    });
+    isFirstVisit = true;
+  }
+
+  await profile.save();
+
+  if (isFirstVisit) {
+    awardPoints(userId, POINTS.store_visited, 'store_visit').catch(() => {});
+  }
+  checkAndAwardBadges(userId).catch(() => {});
+
+  successResponse(res, 'Check-in recorded', {
+    storesVisited: profile.storesVisited,
+  });
+});
+
+export const addCoffeeTried = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!.userId;
+  const { coffeeId, coffeeName } = req.body as { coffeeId: string; coffeeName: string };
+
+  if (!coffeeId || !coffeeName) {
+    errorResponse(res, 'coffeeId and coffeeName are required', 400);
+    return;
+  }
+
+  const profile = await getOrCreateProfile(userId);
+
+  if (!profile.coffeesTriedIds.includes(coffeeId)) {
+    profile.coffeesTriedIds.push(coffeeId);
+    profile.coffeesTriedNames.push(coffeeName);
+    await profile.save();
+  }
+
+  successResponse(res, 'Coffee added', {
+    coffeesTriedNames: profile.coffeesTriedNames,
+  });
+});
+
+// ─── Leaderboard ──────────────────────────────────────────────────────────────
+
+export const getLeaderboard = asyncHandler(async (req: Request, res: Response) => {
+  const profiles = await CommunityProfile.find()
+    .sort({ levelPoints: -1 })
+    .limit(20)
+    .lean();
+
+  const userIds = profiles.map((p) => p.userId);
+  const users = await User.find({ _id: { $in: userIds } })
+    .select('name avatar')
+    .lean();
+
+  const userMap = new Map(users.map((u) => [String(u._id), u]));
+
+  const leaderboard = profiles.map((p) => {
+    const user = userMap.get(String(p.userId));
+    return {
+      userId: String(p.userId),
+      name: user?.name ?? 'Unknown',
+      avatar: user?.avatar,
+      level: p.level,
+      levelPoints: p.levelPoints,
+      totalBrews: p.totalBrews,
+      badgesCount: p.badges.length,
+    };
+  });
+
+  successResponse(res, 'Leaderboard fetched', leaderboard);
 });
 
 // ─── Follow / Unfollow ────────────────────────────────────────────────────────
@@ -77,6 +224,10 @@ export const followUser = asyncHandler(async (req: Request, res: Response) => {
     User.findByIdAndUpdate(currentUserId, { $inc: { followingCount: 1 } }),
     User.findByIdAndUpdate(targetId, { $inc: { followersCount: 1 } }),
   ]);
+
+  // Award points to the followed user for gaining a follower
+  awardPoints(targetId, POINTS.follower_gained, 'follower').catch(() => {});
+  checkAndAwardBadges(targetId).catch(() => {});
 
   successResponse(res, 'User followed', null, 201);
 });
@@ -171,6 +322,11 @@ export const getFeed = asyncHandler(async (req: Request, res: Response) => {
   const followingDocs = await Follow.find({ follower: userId }).select('following').lean();
   const followingIds = followingDocs.map((f) => f.following);
 
+  if (followingIds.length === 0) {
+    successResponse(res, 'Feed fetched', [], 200, { page, limit, total: 0, pages: 0 });
+    return;
+  }
+
   const [shares, total] = await Promise.all([
     BrewShare.find({ user: { $in: followingIds } })
       .sort({ createdAt: -1 })
@@ -244,6 +400,22 @@ export const createShare = asyncHandler(async (req: Request, res: Response) => {
     return;
   }
 
+  // Check suspension
+  const communityProfile = await CommunityProfile.findOne({ userId }).lean();
+  if (communityProfile?.isSuspended) {
+    const until = communityProfile.suspendedUntil;
+    if (!until || until > new Date()) {
+      const untilMsg = until ? ` until ${until.toDateString()}` : '';
+      errorResponse(res, `Your account is suspended${untilMsg}. You cannot post brew shares.`, 403);
+      return;
+    }
+    // Suspension expired — clear it
+    await CommunityProfile.updateOne(
+      { userId },
+      { $set: { isSuspended: false, suspendedUntil: undefined, suspendedReason: undefined } }
+    );
+  }
+
   const brewLog = await BrewLog.findOne({ _id: brewLogId, user: userId });
   if (!brewLog) {
     errorResponse(res, 'Brew log not found or does not belong to you', 404);
@@ -260,6 +432,14 @@ export const createShare = asyncHandler(async (req: Request, res: Response) => {
     { path: 'user', select: 'name avatar bio' },
     { path: 'brewLog', select: 'rating tasteNotes comments completedAt brewMethod' },
   ]);
+
+  // Fire-and-forget: award points + badges, update totalBrews
+  Promise.all([
+    awardPoints(userId, POINTS.brew_logged, 'brew'),
+    CommunityProfile.updateOne({ userId }, { $inc: { totalBrews: 1 } }, { upsert: false }),
+  ])
+    .then(() => checkAndAwardBadges(userId))
+    .catch(() => {});
 
   successResponse(res, 'Brew shared', populated, 201);
 });
@@ -310,15 +490,160 @@ export const toggleLike = asyncHandler(async (req: Request, res: Response) => {
   if (alreadyLiked) {
     share.likes = share.likes.filter((l) => !l.equals(userOid));
     share.likesCount = Math.max(0, share.likesCount - 1);
+    await share.save();
+    // Decrement likesGiven for liker, decrement likesReceived for owner
+    Promise.all([
+      CommunityProfile.updateOne({ userId }, { $inc: { totalLikesGiven: -1 } }),
+      CommunityProfile.updateOne(
+        { userId: share.user.toString() },
+        { $inc: { totalLikesReceived: -1 } }
+      ),
+    ]).catch(() => {});
   } else {
     share.likes.push(userOid);
     share.likesCount += 1;
+    await share.save();
+    // Award points + badges to share owner (fire-and-forget)
+    const ownerId = share.user.toString();
+    Promise.all([
+      CommunityProfile.updateOne({ userId }, { $inc: { totalLikesGiven: 1 } }),
+      CommunityProfile.updateOne(
+        { userId: ownerId },
+        { $inc: { totalLikesReceived: 1 } }
+      ),
+      awardPoints(ownerId, POINTS.brew_liked_received, 'like_received'),
+    ])
+      .then(() => checkAndAwardBadges(ownerId))
+      .catch(() => {});
   }
-
-  await share.save();
 
   successResponse(res, alreadyLiked ? 'Like removed' : 'Like added', {
     liked: !alreadyLiked,
     likesCount: share.likesCount,
   });
+});
+
+// ─── Admin Moderation ─────────────────────────────────────────────────────────
+
+export const getModerationProfiles = asyncHandler(async (req: Request, res: Response) => {
+  const profiles = await CommunityProfile.find({
+    $or: [{ warningCount: { $gt: 0 } }, { isSuspended: true }],
+  })
+    .sort({ warningCount: -1, isSuspended: -1 })
+    .lean();
+
+  const userIds = profiles.map((p) => p.userId);
+  const users = await User.find({ _id: { $in: userIds } })
+    .select('name email avatar')
+    .lean();
+
+  const userMap = new Map(users.map((u) => [String(u._id), u]));
+
+  const result = profiles.map((p) => ({
+    ...p,
+    user: userMap.get(String(p.userId)),
+  }));
+
+  successResponse(res, 'Moderation profiles fetched', result);
+});
+
+export const warnUser = asyncHandler(async (req: Request, res: Response) => {
+  const targetId = req.params['userId'] as string;
+  const adminId = req.user!.userId;
+  const { reason } = req.body as { reason: string };
+
+  if (!mongoose.isValidObjectId(targetId)) {
+    errorResponse(res, 'Invalid user ID', 400);
+    return;
+  }
+  if (!reason) {
+    errorResponse(res, 'reason is required', 400);
+    return;
+  }
+
+  const profile = await getOrCreateProfile(targetId);
+  profile.warningCount += 1;
+  profile.moderatorNotes.push({
+    note: `Warning: ${reason}`,
+    addedBy: toOid(adminId),
+    addedAt: new Date(),
+  });
+  await profile.save();
+
+  createNotification({
+    userId: targetId,
+    type: 'general',
+    title: 'Community Warning',
+    body: `You have received a warning: ${reason}`,
+  }).catch(() => {});
+
+  successResponse(res, 'Warning issued', { warningCount: profile.warningCount });
+});
+
+export const suspendUser = asyncHandler(async (req: Request, res: Response) => {
+  const targetId = req.params['userId'] as string;
+  const adminId = req.user!.userId;
+  const { reason, days } = req.body as { reason: string; days: number };
+
+  if (!mongoose.isValidObjectId(targetId)) {
+    errorResponse(res, 'Invalid user ID', 400);
+    return;
+  }
+  if (!reason || !days || days < 1) {
+    errorResponse(res, 'reason and days (>= 1) are required', 400);
+    return;
+  }
+
+  const suspendedUntil = new Date();
+  suspendedUntil.setDate(suspendedUntil.getDate() + days);
+
+  const profile = await getOrCreateProfile(targetId);
+  profile.isSuspended = true;
+  profile.suspendedUntil = suspendedUntil;
+  profile.suspendedReason = reason;
+  profile.moderatorNotes.push({
+    note: `Suspended for ${days} day(s): ${reason}`,
+    addedBy: toOid(adminId),
+    addedAt: new Date(),
+  });
+  await profile.save();
+
+  createNotification({
+    userId: targetId,
+    type: 'general',
+    title: 'Account Suspended',
+    body: `Your community account has been suspended until ${suspendedUntil.toDateString()}: ${reason}`,
+  }).catch(() => {});
+
+  successResponse(res, 'User suspended', { suspendedUntil });
+});
+
+export const unsuspendUser = asyncHandler(async (req: Request, res: Response) => {
+  const targetId = req.params['userId'] as string;
+  const adminId = req.user!.userId;
+
+  if (!mongoose.isValidObjectId(targetId)) {
+    errorResponse(res, 'Invalid user ID', 400);
+    return;
+  }
+
+  const profile = await getOrCreateProfile(targetId);
+  profile.isSuspended = false;
+  profile.suspendedUntil = undefined;
+  profile.suspendedReason = undefined;
+  profile.moderatorNotes.push({
+    note: 'Suspension lifted',
+    addedBy: toOid(adminId),
+    addedAt: new Date(),
+  });
+  await profile.save();
+
+  createNotification({
+    userId: targetId,
+    type: 'general',
+    title: 'Suspension Lifted',
+    body: 'Your community account suspension has been removed.',
+  }).catch(() => {});
+
+  successResponse(res, 'User unsuspended');
 });

@@ -25,13 +25,13 @@ const seed = async (): Promise<void> => {
   console.log('Cleared BrewMethod, Recipe, ExclusiveContent, and StoreRecipe collections');
 
   // Create admin user only if none exists
-  let admin = await User.findOne({ role: 'admin' });
+  let admin = await User.findOne({ role: 'owner' });
   if (!admin) {
     admin = await User.create({
       name: 'JavaRista Admin',
       email: 'admin@javarista.com',
       password: 'Admin@123',
-      role: 'admin',
+      role: 'owner',
       isVerified: true,
     });
     console.log('Admin user created:', admin.email);

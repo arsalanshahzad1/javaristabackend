@@ -15,15 +15,26 @@ import academyRoutes from './routes/academy.routes';
 import certificationRoutes from './routes/certification.routes';
 import playbookRoutes from './routes/playbook.routes';
 import checklistRoutes from './routes/checklist.routes';
+import checklistScheduleRoutes from './routes/checklistSchedule.routes';
 import performanceRoutes from './routes/performance.routes';
 import communityRoutes from './routes/community.routes';
 import investorRoutes from './routes/investor.routes';
 import storeOpsRoutes from './routes/store-ops.routes';
+import roleManualRoutes from './routes/roleManual.routes';
+import metricsRoutes from './routes/metrics.routes';
+import employeeProfileRoutes from './routes/employeeProfile.routes';
+import uploadRoutes from './routes/upload.routes';
+import storeRoutes from './routes/store.routes';
+import notificationRoutes from './routes/notification.routes';
+import constructionJournalRoutes from './routes/constructionJournal.routes';
+import sourcingStoryRoutes from './routes/sourcingStory.routes';
+import enrollmentRoutes from './routes/enrollment.routes';
+import orgRoutes from './routes/org.routes';
+import regionDashboardRoutes from './routes/region-dashboard.routes';
 import connectDB from './config/db';
 import rateLimit from 'express-rate-limit';
-import { createRequire } from 'module';
-
-const require = createRequire(import.meta.url);
+import { startCertificationExpiryJob } from './jobs/certificationExpiry.job';
+import { startMissedChecklistJob } from './jobs/missed-checklist.job';
 
 const app: Application = express();
 
@@ -78,10 +89,22 @@ app.use('/api/academy', academyRoutes);
 app.use('/api/certifications', certificationRoutes);
 app.use('/api/playbooks', playbookRoutes);
 app.use('/api/checklists', checklistRoutes);
+app.use('/api/checklist-schedules', checklistScheduleRoutes);
 app.use('/api/performance', performanceRoutes);
 app.use('/api/community', communityRoutes);
 app.use('/api/investor', investorRoutes);
 app.use('/api/store-ops', storeOpsRoutes);
+app.use('/api/role-manuals', roleManualRoutes);
+app.use('/api/metrics', metricsRoutes);
+app.use('/api/employees', employeeProfileRoutes);
+app.use('/api/upload', uploadRoutes);
+app.use('/api/stores', storeRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/construction-journals', constructionJournalRoutes);
+app.use('/api/sourcing-stories', sourcingStoryRoutes);
+app.use('/api/enrollments', enrollmentRoutes);
+app.use('/api/org', orgRoutes);
+app.use('/api/regions', regionDashboardRoutes);
 
 app.use(errorMiddleware);
 
@@ -89,6 +112,8 @@ const PORT = process.env.PORT || 5001;
 connectDB().then(() => {
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
+    startCertificationExpiryJob();
+    startMissedChecklistJob();
   });
 });
 

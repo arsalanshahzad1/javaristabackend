@@ -1,5 +1,21 @@
-import mongoose, { Document, Schema, Model } from 'mongoose';
+import mongoose, { Document, Schema, Model, Types } from 'mongoose';
 import bcrypt from 'bcryptjs';
+
+export type UserRole =
+  | 'owner'
+  | 'ceo'
+  | 'coo'
+  | 'cfo'
+  | 'regional_manager'
+  | 'area_manager'
+  | 'store_manager'
+  | 'assistant_manager'
+  | 'shift_supervisor'
+  | 'barista'
+  | 'trainee'
+  | 'investor'
+  | 'hr_manager'
+  | 'marketing_manager';
 
 export interface IUser extends Document {
   name: string;
@@ -7,7 +23,7 @@ export interface IUser extends Document {
   password: string;
   avatar?: string;
   bio?: string;
-  role: 'community' | 'investor' | 'employee' | 'admin';
+  role: UserRole;
   isVerified: boolean;
   isPremium: boolean;
   isActive: boolean;
@@ -17,8 +33,38 @@ export interface IUser extends Document {
   refreshToken?: string;
   followersCount: number;
   followingCount: number;
+  storeId?: string;
+  regionId?: string;
+  department?: string;
+  reportingTo?: string;
+  promotionReadiness?: 'ready' | 'needs_training' | 'not_evaluated';
+  javaRistaScore?: number;
+  lastComputedAt?: Date;
+  lastComputeReason?: string;
+  investorAccessLevel?: 'shareholder' | 'major_investor' | 'board';
+  reportsTo?: Types.ObjectId | null;
+  directReports: Types.ObjectId[];
+  hierarchyPath: Types.ObjectId[];
+  hierarchyDepth: number;
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
+
+const USER_ROLES: UserRole[] = [
+  'owner',
+  'ceo',
+  'coo',
+  'cfo',
+  'regional_manager',
+  'area_manager',
+  'store_manager',
+  'assistant_manager',
+  'shift_supervisor',
+  'barista',
+  'trainee',
+  'investor',
+  'hr_manager',
+  'marketing_manager',
+];
 
 const UserSchema = new Schema<IUser>(
   {
@@ -27,7 +73,7 @@ const UserSchema = new Schema<IUser>(
     password: { type: String, required: true, minlength: 8, select: false },
     avatar: { type: String },
     bio: { type: String, maxlength: 160 },
-    role: { type: String, enum: ['community', 'investor', 'employee', 'admin'], default: 'community' },
+    role: { type: String, enum: USER_ROLES, default: 'trainee' },
     isVerified: { type: Boolean, default: false },
     isPremium: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
@@ -37,9 +83,27 @@ const UserSchema = new Schema<IUser>(
     refreshToken: { type: String, select: false },
     followersCount: { type: Number, default: 0 },
     followingCount: { type: Number, default: 0 },
+    storeId: { type: String },
+    regionId: { type: String },
+    department: { type: String },
+    reportingTo: { type: String },
+    promotionReadiness: { type: String, enum: ['ready', 'needs_training', 'not_evaluated'] },
+    javaRistaScore: { type: Number, default: 0, min: 0, max: 100 },
+    lastComputedAt: { type: Date },
+    lastComputeReason: { type: String },
+    investorAccessLevel: {
+      type: String,
+      enum: ['shareholder', 'major_investor', 'board'],
+    },
+    reportsTo: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    directReports: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    hierarchyPath: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    hierarchyDepth: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
+
+UserSchema.index({ reportsTo: 1 });
 
 UserSchema.pre('save', async function () {
   if (!this.isModified('password')) return;

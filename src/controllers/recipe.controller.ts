@@ -70,7 +70,7 @@ export const updateRecipe = asyncHandler(async (req: Request, res: Response) => 
   }
 
   const isOwner = recipe.author.toString() === req.user!.userId;
-  const isAdmin = req.user!.role === 'admin';
+  const isAdmin = req.user!.role === 'owner';
   if (!isOwner && !isAdmin) {
     errorResponse(res, 'Not authorized to update this recipe', 403);
     return;
@@ -101,7 +101,7 @@ export const deleteRecipe = asyncHandler(async (req: Request, res: Response) => 
   }
 
   const isOwner = recipe.author.toString() === req.user!.userId;
-  const isAdmin = req.user!.role === 'admin';
+  const isAdmin = req.user!.role === 'owner';
   if (!isOwner && !isAdmin) {
     errorResponse(res, 'Not authorized to delete this recipe', 403);
     return;

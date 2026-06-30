@@ -137,7 +137,7 @@ export const getUserProfile = asyncHandler(async (req: Request, res: Response) =
 });
 
 export const getTeamProfiles = asyncHandler(async (req: Request, res: Response) => {
-  const employees = await User.find({ role: 'employee' }).select('name email role');
+  const employees = await User.find({ role: { $in: ['barista', 'trainee', 'shift_supervisor', 'store_manager', 'assistant_manager'] } }).select('name email role');
 
   if (employees.length === 0) {
     successResponse(res, 'Team profiles fetched', []);

@@ -10,7 +10,7 @@ import { successResponse, errorResponse } from '../utils/response';
 import asyncHandler from '../utils/asyncHandler';
 import { serializeRecipeForUi } from '../utils/recipe.mapper';
 
-const USER_ROLES = ['community', 'investor', 'employee', 'admin'];
+const USER_ROLES = ['owner', 'ceo', 'coo', 'cfo', 'regional_manager', 'area_manager', 'store_manager', 'assistant_manager', 'shift_supervisor', 'barista', 'trainee', 'investor', 'hr_manager', 'marketing_manager'];
 
 function serializeAdminUser(user: {
   _id: unknown;
@@ -22,6 +22,7 @@ function serializeAdminUser(user: {
   followersCount?: number;
   followingCount?: number;
   createdAt?: Date;
+  investorAccessLevel?: string;
 }) {
   return {
     id: String(user._id),
@@ -34,6 +35,7 @@ function serializeAdminUser(user: {
     followersCount: user.followersCount ?? 0,
     followingCount: user.followingCount ?? 0,
     createdAt: user.createdAt,
+    investorAccessLevel: user.investorAccessLevel,
   };
 }
 
@@ -144,7 +146,7 @@ export const updateUser = asyncHandler(async (req: Request, res: Response) => {
 const PREMIUM_ROLES = new Set(['investor', 'employee', 'admin']);
 
 export const updateUserRole = asyncHandler(async (req: Request, res: Response) => {
-  const { role, isPremium } = req.body;
+  const { role, isPremium, investorAccessLevel } = req.body;
 
   if (!USER_ROLES.includes(role)) {
     errorResponse(res, `Invalid role. Must be one of: ${USER_ROLES.join(', ')}`, 400);
@@ -157,6 +159,15 @@ export const updateUserRole = asyncHandler(async (req: Request, res: Response) =
     isPremium: premium,
     subscriptionStatus: premium ? 'active' : 'none',
   };
+
+  if (role === 'investor') {
+    const validLevels = ['shareholder', 'major_investor', 'board'];
+    updates['investorAccessLevel'] = validLevels.includes(investorAccessLevel)
+      ? investorAccessLevel
+      : undefined;
+  } else {
+    updates['investorAccessLevel'] = undefined;
+  }
 
   const user = await User.findByIdAndUpdate(req.params['userId'], updates, {
     new: true,

@@ -36,7 +36,7 @@ async function seedUsers() {
       name: 'Admin User',
       email: 'admin@javatimes.com',
       password: 'Admin@1234',
-      role: 'admin',
+      role: 'owner',
       isVerified: true,
       isPremium: true,
       subscriptionStatus: 'active',
@@ -46,7 +46,7 @@ async function seedUsers() {
       name: 'Sara Malik',
       email: 'employee@javatimes.com',
       password: 'Employee@1234',
-      role: 'employee',
+      role: 'barista',
       isVerified: true,
       isPremium: false,
       subscriptionStatus: 'none',
@@ -66,7 +66,7 @@ async function seedUsers() {
       name: 'Ali Coffee',
       email: 'community@javatimes.com',
       password: 'Community@1234',
-      role: 'community',
+      role: 'trainee',
       isVerified: true,
       isPremium: false,
       subscriptionStatus: 'none',
@@ -763,7 +763,8 @@ async function seedPlaybooks(adminUser: any) {
   await Playbook.deleteMany({});
   log('Cleared playbooks');
 
-  const playbooks = await Playbook.create([
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const playbooks = await (Playbook.create as unknown as (docs: any[]) => Promise<any[]>)([
     {
       title: 'Store Opening Procedure',
       slug: 'store-opening-procedure',
@@ -1464,7 +1465,7 @@ async function main() {
     log('Starting full seed...');
 
     const users = await seedUsers();
-    const adminUser = users.find((u) => u.role === 'admin')!;
+    const adminUser = users.find((u) => u.role === 'owner')!;
 
     const brewMethods = await seedBrewMethods();
     await seedRecipes(brewMethods, adminUser);

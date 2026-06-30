@@ -5,23 +5,23 @@ import { successResponse, errorResponse } from '../utils/response';
 import Course from '../models/course.model';
 import Lesson from '../models/lesson.model';
 import CourseEnrollment from '../models/course-enrollment.model';
+import LearningPath from '../models/LearningPath';
 import { JwtPayload } from '../utils/jwt';
 import { issueLevelCertification } from './certification.controller';
 
 // Maps a user's auth state to which requiredRole values they may access.
-// community < investor < employee — admin bypasses all restrictions.
+// community < investor < employee — owner bypasses all restrictions.
 function getAllowedRoles(user?: JwtPayload): string[] {
   if (!user) return ['community'];
-  if (user.role === 'admin') return ['community', 'investor', 'employee'];
-  if (user.role === 'employee') return ['community', 'investor', 'employee'];
   if (user.role === 'investor') return ['community', 'investor'];
-  return ['community'];
+  // All authenticated operational staff get full employee-tier access
+  return ['community', 'investor', 'employee'];
 }
 
 // GET /api/academy/courses
 export const getCourses = asyncHandler(async (req: Request, res: Response) => {
   const { category, level } = req.query;
-  const isAdmin = req.user?.role === 'admin';
+  const isAdmin = req.user?.role === 'owner';
   const allowedRoles = getAllowedRoles(req.user);
 
   const filter: Record<string, unknown> = isAdmin
@@ -44,7 +44,7 @@ export const getCourses = asyncHandler(async (req: Request, res: Response) => {
 // GET /api/academy/courses/:slug
 export const getCourse = asyncHandler(async (req: Request, res: Response) => {
   const allowedRoles = getAllowedRoles(req.user);
-  const isAdmin = req.user?.role === 'admin';
+  const isAdmin = req.user?.role === 'owner';
   const courseParam = String(req.params['slug'] ?? '');
   const courseQuery = Types.ObjectId.isValid(courseParam)
     ? { _id: courseParam }
@@ -353,6 +353,73 @@ export const completeLesson = asyncHandler(async (req: Request, res: Response) =
     alreadyCompleted ? 'Lesson already completed' : 'Lesson marked complete',
     { ...enrollment.toObject(), progressPercent }
   );
+});
+
+// ── Learning Path controllers ────────────────────────────────────────────────
+
+// GET /api/academy/paths
+export const getPaths = asyncHandler(async (req: Request, res: Response) => {
+  const isAdmin = req.user?.role === 'owner';
+  const filter = isAdmin ? {} : { isActive: true };
+  const paths = await LearningPath.find(filter)
+    .select('-__v')
+    .sort({ createdAt: -1 })
+    .populate('courses', 'title slug category level thumbnail lessons');
+  successResponse(res, 'Learning paths fetched', paths);
+});
+
+// GET /api/academy/paths/my
+export const getMyPaths = asyncHandler(async (req: Request, res: Response) => {
+  const role = req.user!.role;
+  const paths = await LearningPath.find({ isActive: true, targetRoles: role })
+    .select('-__v')
+    .populate('courses', 'title slug category level thumbnail lessons description');
+  successResponse(res, 'My learning paths fetched', paths);
+});
+
+// POST /api/academy/paths
+export const createPath = asyncHandler(async (req: Request, res: Response) => {
+  const path = await LearningPath.create({
+    title: req.body.title,
+    description: req.body.description,
+    targetRoles: req.body.targetRoles ?? [],
+    targetStores: req.body.targetStores ?? [],
+    targetRegions: req.body.targetRegions ?? [],
+    courses: req.body.courses ?? [],
+    prerequisites: req.body.prerequisites ?? [],
+    category: req.body.category,
+    estimatedWeeks: req.body.estimatedWeeks,
+    isActive: req.body.isActive ?? true,
+    createdBy: req.user!.userId,
+  });
+  successResponse(res, 'Learning path created', path, 201);
+});
+
+// PUT /api/academy/paths/:id
+export const updatePath = asyncHandler(async (req: Request, res: Response) => {
+  const updates: Record<string, unknown> = {};
+  const fields = ['title', 'description', 'targetRoles', 'targetStores', 'targetRegions', 'courses', 'prerequisites', 'category', 'estimatedWeeks', 'isActive'];
+  for (const f of fields) {
+    if (req.body[f] !== undefined) updates[f] = req.body[f];
+  }
+  const path = await LearningPath.findByIdAndUpdate(req.params['id'], updates, { new: true, runValidators: true });
+  if (!path) { errorResponse(res, 'Learning path not found', 404); return; }
+  successResponse(res, 'Learning path updated', path);
+});
+
+// DELETE /api/academy/paths/:id
+export const deletePath = asyncHandler(async (req: Request, res: Response) => {
+  const path = await LearningPath.findByIdAndDelete(req.params['id']);
+  if (!path) { errorResponse(res, 'Learning path not found', 404); return; }
+  successResponse(res, 'Learning path deleted');
+});
+
+// POST /api/academy/paths/:id/enroll
+export const enrollPath = asyncHandler(async (req: Request, res: Response) => {
+  const path = await LearningPath.findOne({ _id: req.params['id'], isActive: true });
+  if (!path) { errorResponse(res, 'Learning path not found', 404); return; }
+  await LearningPath.findByIdAndUpdate(path._id, { $inc: { enrollmentCount: 1 } });
+  successResponse(res, 'Enrolled in learning path', { pathId: path._id });
 });
 
 // POST /api/academy/lessons/:id/quiz-submit  (requires auth)
