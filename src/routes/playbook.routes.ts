@@ -21,37 +21,41 @@ import {
 } from '../controllers/playbook.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { adminMiddleware } from '../middleware/admin.middleware';
-import { requireRole } from '../middleware/requireRole';
+import { requireEmployeePermission } from '../middleware/requireEmployeePermission';
 import { uploadPlaybookMedia } from '../config/cloudinary';
 
 const router = Router();
 
-const employeeOrAdmin = [authMiddleware, requireRole('owner','ceo','coo','cfo','regional_manager','area_manager','store_manager','assistant_manager','shift_supervisor','barista','trainee','hr_manager','marketing_manager')];
+// Corporate roles bypass; employee-tier users need playbook.view
+const canViewPlaybooks = [authMiddleware, requireEmployeePermission('playbook.view')];
 const adminOnly = [authMiddleware, adminMiddleware];
 
-// Reading list — must be before /:slug to avoid slug match
+// Reading list — auth only (unchanged)
 router.get('/my-reading-list', authMiddleware, getMyReadingList);
 
-router.get('/', ...employeeOrAdmin, getPlaybooks);
-router.get('/:slug', ...employeeOrAdmin, getPlaybook);
-router.post('/', ...employeeOrAdmin, adminMiddleware, createPlaybook);
-router.put('/:slug', ...employeeOrAdmin, adminMiddleware, updatePlaybook);
-router.delete('/:slug', ...employeeOrAdmin, adminMiddleware, deletePlaybook);
+// List / detail
+router.get('/', ...canViewPlaybooks, getPlaybooks);
+router.get('/:slug', ...canViewPlaybooks, getPlaybook);
 
-// Workflow
-router.put('/:id/submit-review', ...employeeOrAdmin, submitForReview);
+// Admin write (unchanged)
+router.post('/', ...canViewPlaybooks, adminMiddleware, createPlaybook);
+router.put('/:slug', ...canViewPlaybooks, adminMiddleware, updatePlaybook);
+router.delete('/:slug', ...canViewPlaybooks, adminMiddleware, deletePlaybook);
+
+// Workflow — submitting for review requires playbook.view at minimum
+router.put('/:id/submit-review', ...canViewPlaybooks, submitForReview);
 router.put('/:id/approve', ...adminOnly, approvePlaybook);
 router.put('/:id/publish', ...adminOnly, publishPlaybook);
 router.put('/:id/archive', ...adminOnly, archivePlaybook);
 router.put('/:id/new-version', ...adminOnly, newVersion);
-router.get('/:id/changelog', ...employeeOrAdmin, getChangelog);
+router.get('/:id/changelog', ...canViewPlaybooks, getChangelog);
 
-// Attachments
+// Attachments — admin only (unchanged)
 router.post('/:id/attachments', ...adminOnly, uploadPlaybookMedia.single('file'), addAttachment);
 router.delete('/:id/attachments/:attachmentId', ...adminOnly, deleteAttachment);
 router.post('/:id/video', ...adminOnly, addVideoUrl);
 
-// Compliance tracking
+// Compliance tracking — auth only (unchanged)
 router.post('/:id/read', authMiddleware, markAsRead);
 router.post('/:id/acknowledge', authMiddleware, acknowledgePlaybook);
 router.get('/:id/compliance', ...adminOnly, getCompliance);

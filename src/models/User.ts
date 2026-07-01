@@ -1,5 +1,6 @@
 import mongoose, { Document, Schema, Model, Types } from 'mongoose';
 import bcrypt from 'bcryptjs';
+import type { IEmployeeRole } from './EmployeeRole';
 
 export type UserRole =
   | 'owner'
@@ -46,6 +47,8 @@ export interface IUser extends Document {
   directReports: Types.ObjectId[];
   hierarchyPath: Types.ObjectId[];
   hierarchyDepth: number;
+  // Additive field for employee-tier users only. Corporate-tier users leave this null.
+  employeeRoleId?: Types.ObjectId | IEmployeeRole | null;
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
@@ -99,6 +102,7 @@ const UserSchema = new Schema<IUser>(
     directReports: [{ type: Schema.Types.ObjectId, ref: 'User' }],
     hierarchyPath: [{ type: Schema.Types.ObjectId, ref: 'User' }],
     hierarchyDepth: { type: Number, default: 0 },
+    employeeRoleId: { type: Schema.Types.ObjectId, ref: 'EmployeeRole', default: null },
   },
   { timestamps: true }
 );

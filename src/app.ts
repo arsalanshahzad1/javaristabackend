@@ -31,6 +31,7 @@ import sourcingStoryRoutes from './routes/sourcingStory.routes';
 import enrollmentRoutes from './routes/enrollment.routes';
 import orgRoutes from './routes/org.routes';
 import regionDashboardRoutes from './routes/region-dashboard.routes';
+import employeeRoleRoutes from './routes/employeeRole.routes';
 import connectDB from './config/db';
 import rateLimit from 'express-rate-limit';
 import { startCertificationExpiryJob } from './jobs/certificationExpiry.job';
@@ -105,6 +106,7 @@ app.use('/api/sourcing-stories', sourcingStoryRoutes);
 app.use('/api/enrollments', enrollmentRoutes);
 app.use('/api/org', orgRoutes);
 app.use('/api/regions', regionDashboardRoutes);
+app.use('/api/employee-roles', employeeRoleRoutes);
 
 app.use(errorMiddleware);
 

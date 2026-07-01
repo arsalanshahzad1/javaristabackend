@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import User from '../models/User';
+import EmployeeRole from '../models/EmployeeRole';
 import BrewMethod from '../models/BrewMethod';
 import Recipe from '../models/Recipe';
 import Course from '../models/course.model';
@@ -17,7 +18,7 @@ const seed = async (): Promise<void> => {
   await mongoose.connect(process.env.MONGODB_URI as string);
   console.log('MongoDB connected');
 
-  // Clear seeded collections
+  // Clear seeded collections (not Users — preserve owner + any manual additions)
   await BrewMethod.deleteMany({});
   await Recipe.deleteMany({});
   await ExclusiveContent.deleteMany({});
@@ -38,6 +39,236 @@ const seed = async (): Promise<void> => {
   } else {
     console.log('Admin user already exists:', admin.email);
   }
+
+  // ── Employee Roles ─────────────────────────────────────────────────────────
+  // Remove all org-wide (storeId-less) seeded roles then recreate so re-runs are idempotent.
+  await EmployeeRole.deleteMany({ storeId: { $exists: false } });
+  console.log('Cleared org-wide EmployeeRole documents');
+
+  const employeeRoleDefs = [
+    {
+      name: 'Unit Manager',
+      description: 'Full store operations access — equivalent to store_manager tier.',
+      permissions: [
+        'checklist.view', 'checklist.complete', 'checklist.approve',
+        'recipe.view', 'recipe.log_prep',
+        'playbook.view', 'playbook.acknowledge',
+        'performance.view_own',
+        'training.view', 'training.enroll', 'training.manage',
+        'cash.manage',
+        'inventory.view', 'inventory.manage',
+        'store_ops.view',
+        'org.view',
+      ],
+    },
+    {
+      name: 'Shift Leader',
+      description: 'Opens/closes, manages cash, oversees floor during shift.',
+      permissions: [
+        'checklist.view', 'checklist.complete', 'checklist.approve',
+        'recipe.view', 'recipe.log_prep',
+        'playbook.view', 'playbook.acknowledge',
+        'performance.view_own',
+        'training.view', 'training.enroll',
+        'cash.manage',
+        'inventory.view',
+        'store_ops.view',
+      ],
+    },
+    {
+      name: 'Cash & Service Supervisor',
+      description: 'Owns cash drawer, POS, and customer service resolution.',
+      permissions: [
+        'checklist.view', 'checklist.complete',
+        'playbook.view', 'playbook.acknowledge',
+        'performance.view_own',
+        'training.view', 'training.enroll',
+        'cash.manage',
+        'store_ops.view',
+      ],
+    },
+    {
+      name: 'Lead Barista',
+      description: 'Experienced barista who trains others and maintains quality standards.',
+      permissions: [
+        'checklist.view', 'checklist.complete',
+        'recipe.view', 'recipe.log_prep',
+        'playbook.view', 'playbook.acknowledge',
+        'performance.view_own',
+        'training.view', 'training.enroll', 'training.manage',
+        'store_ops.view',
+      ],
+    },
+    {
+      name: 'Barista',
+      description: 'Core beverage preparation role.',
+      permissions: [
+        'checklist.view', 'checklist.complete',
+        'recipe.view', 'recipe.log_prep',
+        'playbook.view', 'playbook.acknowledge',
+        'performance.view_own',
+        'training.view', 'training.enroll',
+        'store_ops.view',
+      ],
+    },
+    {
+      name: 'Cashier',
+      description: 'Order taking, POS, and customer-facing transactions.',
+      permissions: [
+        'checklist.view', 'checklist.complete',
+        'playbook.view', 'playbook.acknowledge',
+        'performance.view_own',
+        'training.view', 'training.enroll',
+        'cash.manage',
+        'store_ops.view',
+      ],
+    },
+    {
+      name: 'Runner',
+      description: 'Order handoff, staging area, and expediting.',
+      permissions: [
+        'checklist.view', 'checklist.complete',
+        'playbook.view', 'playbook.acknowledge',
+        'performance.view_own',
+        'training.view', 'training.enroll',
+        'store_ops.view',
+      ],
+    },
+    {
+      name: 'Floor Host',
+      description: 'Guest experience, seating, and lobby cleanliness.',
+      permissions: [
+        'checklist.view', 'checklist.complete',
+        'playbook.view', 'playbook.acknowledge',
+        'performance.view_own',
+        'training.view', 'training.enroll',
+        'store_ops.view',
+      ],
+    },
+    {
+      name: 'Cook',
+      description: 'Back-of-house food and specialty beverage preparation.',
+      permissions: [
+        'checklist.view', 'checklist.complete',
+        'recipe.view', 'recipe.log_prep',
+        'playbook.view', 'playbook.acknowledge',
+        'performance.view_own',
+        'training.view', 'training.enroll',
+        'store_ops.view',
+      ],
+    },
+    {
+      name: 'Kitchen Assistant',
+      description: 'Supports cook with prep, mise en place, and cleaning.',
+      permissions: [
+        'checklist.view', 'checklist.complete',
+        'recipe.view',
+        'playbook.view', 'playbook.acknowledge',
+        'performance.view_own',
+        'training.view', 'training.enroll',
+        'store_ops.view',
+      ],
+    },
+    {
+      name: 'Cleaning Associate',
+      description: 'Sanitation, deep-clean checklists, and waste management.',
+      permissions: [
+        'checklist.view', 'checklist.complete',
+        'playbook.view', 'playbook.acknowledge',
+        'performance.view_own',
+        'training.view', 'training.enroll',
+        'store_ops.view',
+      ],
+    },
+    {
+      name: 'Delivery Driver',
+      description: 'Third-party and in-house delivery fulfilment.',
+      permissions: [
+        'checklist.view', 'checklist.complete',
+        'playbook.view', 'playbook.acknowledge',
+        'performance.view_own',
+        'training.view', 'training.enroll',
+        'store_ops.view',
+      ],
+    },
+    {
+      name: 'Inventory Coordinator',
+      description: 'Stock counts, par management, and supplier receiving.',
+      permissions: [
+        'checklist.view', 'checklist.complete',
+        'playbook.view', 'playbook.acknowledge',
+        'performance.view_own',
+        'training.view', 'training.enroll',
+        'inventory.view', 'inventory.manage',
+        'store_ops.view',
+      ],
+    },
+    {
+      name: 'Store Trainer',
+      description: 'Onboards new hires, facilitates certifications.',
+      permissions: [
+        'checklist.view', 'checklist.complete',
+        'recipe.view', 'recipe.log_prep',
+        'playbook.view', 'playbook.acknowledge',
+        'performance.view_own',
+        'training.view', 'training.enroll', 'training.manage',
+        'store_ops.view',
+        'org.view',
+      ],
+    },
+    {
+      name: 'Customer Experience Lead',
+      description: 'Owns guest-satisfaction metrics and complaint resolution.',
+      permissions: [
+        'checklist.view', 'checklist.complete',
+        'playbook.view', 'playbook.acknowledge',
+        'performance.view_own',
+        'training.view', 'training.enroll',
+        'store_ops.view',
+        'org.view',
+      ],
+    },
+  ];
+
+  const seededRoles = await EmployeeRole.insertMany(
+    employeeRoleDefs.map((r) => ({ ...r, createdBy: admin._id }))
+  );
+  console.log(`  Employee roles seeded: ${seededRoles.length}`);
+
+  const roleByName = new Map(seededRoles.map((r) => [r.name, r._id]));
+
+  // ── Test Users ─────────────────────────────────────────────────────────────
+  // Upsert a representative test user for each employee-tier role.
+  const testUsers = [
+    { name: 'Sam Manager',    email: 'store.manager@javarista.com',   role: 'store_manager',      employeeRole: 'Unit Manager' },
+    { name: 'Alex Assistant', email: 'asst.manager@javarista.com',    role: 'assistant_manager',  employeeRole: 'Shift Leader' },
+    { name: 'Jordan Shift',   email: 'shift.sup@javarista.com',       role: 'shift_supervisor',   employeeRole: 'Shift Leader' },
+    { name: 'Casey Barista',  email: 'barista@javarista.com',         role: 'barista',            employeeRole: 'Barista' },
+    { name: 'Taylor Trainee', email: 'trainee@javarista.com',         role: 'trainee',            employeeRole: 'Barista' },
+    { name: 'Riley Cash',     email: 'cashier@javarista.com',         role: 'barista',            employeeRole: 'Cashier' },
+    { name: 'Morgan Lead',    email: 'lead.barista@javarista.com',    role: 'shift_supervisor',   employeeRole: 'Lead Barista' },
+    { name: 'Drew Trainer',   email: 'trainer@javarista.com',         role: 'shift_supervisor',   employeeRole: 'Store Trainer' },
+    { name: 'Pat Inventory',  email: 'inventory@javarista.com',       role: 'barista',            employeeRole: 'Inventory Coordinator' },
+  ] as const;
+
+  for (const u of testUsers) {
+    const exists = await User.findOne({ email: u.email });
+    if (!exists) {
+      await User.create({
+        name: u.name,
+        email: u.email,
+        password: 'Test@1234',
+        role: u.role,
+        isVerified: true,
+        employeeRoleId: roleByName.get(u.employeeRole),
+      });
+    } else if (!exists.employeeRoleId) {
+      await User.findByIdAndUpdate(exists._id, {
+        employeeRoleId: roleByName.get(u.employeeRole),
+      });
+    }
+  }
+  console.log(`  Test users upserted: ${testUsers.length}`);
 
   // Insert brew methods
   const brewMethodDocs = await BrewMethod.insertMany([

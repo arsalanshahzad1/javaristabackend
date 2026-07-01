@@ -146,7 +146,7 @@ export const updateUser = asyncHandler(async (req: Request, res: Response) => {
 const PREMIUM_ROLES = new Set(['investor', 'employee', 'admin']);
 
 export const updateUserRole = asyncHandler(async (req: Request, res: Response) => {
-  const { role, isPremium, investorAccessLevel } = req.body;
+  const { role, isPremium, investorAccessLevel, employeeRoleId } = req.body;
 
   if (!USER_ROLES.includes(role)) {
     errorResponse(res, `Invalid role. Must be one of: ${USER_ROLES.join(', ')}`, 400);
@@ -167,6 +167,16 @@ export const updateUserRole = asyncHandler(async (req: Request, res: Response) =
       : undefined;
   } else {
     updates['investorAccessLevel'] = undefined;
+  }
+
+  // employeeRoleId is only meaningful for employee-tier roles; accept null to unset.
+  const EMPLOYEE_TIER = ['store_manager', 'assistant_manager', 'shift_supervisor', 'barista', 'trainee'];
+  if (EMPLOYEE_TIER.includes(role)) {
+    if (employeeRoleId !== undefined) {
+      updates['employeeRoleId'] = employeeRoleId || null;
+    }
+  } else {
+    updates['employeeRoleId'] = null;
   }
 
   const user = await User.findByIdAndUpdate(req.params['userId'], updates, {
