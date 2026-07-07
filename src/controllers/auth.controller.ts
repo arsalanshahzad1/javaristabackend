@@ -3,17 +3,57 @@ import User from '../models/User';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/jwt';
 import { successResponse, errorResponse } from '../utils/response';
 import asyncHandler from '../utils/asyncHandler';
+import { INVESTINPATH } from '../config/paths';
 
 export const register = asyncHandler(async (req: Request, res: Response) => {
-  const { name, email, password } = req.body;
+  const name = req.body.name ?? req.body.first_name;
+  const email = req.body.email;
+  const password = req.body.password;
+  const nickName = req.body.nickName ?? req.body.last_name ?? name;
+  const phone = req.body.phone ?? req.body.phone_no ?? email;
+  const normalizedEmail = String(email).trim().toLowerCase();
 
-  const existing = await User.findOne({ email });
+  const existing = await User.findOne({ email: normalizedEmail });
   if (existing) {
     errorResponse(res, 'Email already registered', 409);
     return;
   }
 
-  const user = await User.create({ name, email, password });
+  const user = await User.create({
+    name,
+    nickName,
+    phone,
+    email: normalizedEmail,
+    password,
+    role: 'investor',
+    isPremium: true,
+    subscriptionStatus: 'active',
+    isVerified: true,
+    source: 'javarista',
+  });
+
+  const data = {
+    first_name: name,
+    last_name: nickName,
+    email: normalizedEmail,
+    password,
+    phone_no: phone,
+  };
+
+  fetch(`${INVESTINPATH}/register-javarista`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  })
+    .then((response) => response.json())
+    .then((response) => {
+      console.log(response, 'investin registration response');
+    })
+    .catch((error) => {
+      console.error('[auth.register] register-javarista failed:', error);
+    });
 
   const accessToken = generateAccessToken(user._id.toString(), user.role);
   const refreshToken = generateRefreshToken(user._id.toString());
@@ -34,6 +74,70 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
     },
     accessToken,
     refreshToken,
+  }, 201);
+});
+
+export const registerFundraiser = asyncHandler(async (req: Request, res: Response) => {
+  const name = String(req.body.name ?? req.body.first_name ?? '').trim();
+  const email = String(req.body.email ?? '').trim().toLowerCase();
+  const password = String(req.body.password ?? '');
+  const nickName = String(req.body.nickName ?? req.body.last_name ?? name).trim() || name;
+  const phone = String(req.body.phone ?? req.body.phone_no ?? email).trim() || email;
+
+  if (!name || !email || !password) {
+    errorResponse(res, 'Name, email and password are required', 400);
+    return;
+  }
+
+  const existing = await User.findOne({ email });
+  if (existing) {
+    errorResponse(res, 'Email already registered', 409);
+    return;
+  }
+
+  const now = new Date();
+  await User.collection.updateOne(
+    { email },
+    {
+      $set: {
+        name,
+        nickName,
+        phone,
+        password,
+        role: 'investor',
+        isVerified: true,
+        isPremium: true,
+        subscriptionStatus: 'active',
+        isActive: true,
+        source: 'investin',
+        updatedAt: now,
+      },
+      $setOnInsert: {
+        email,
+        createdAt: now,
+        followersCount: 0,
+        followingCount: 0,
+        directReports: [],
+        hierarchyPath: [],
+        hierarchyDepth: 0,
+      },
+    },
+    { upsert: true }
+  );
+
+  const user = await User.findOne({ email });
+
+  successResponse(res, 'Fundraiser registered', {
+    user: {
+      _id: user?._id,
+      name: user?.name,
+      email: user?.email,
+      role: user?.role,
+      isVerified: user?.isVerified,
+      isPremium: user?.isPremium,
+      subscriptionStatus: user?.subscriptionStatus,
+      avatar: user?.avatar,
+    },
   }, 201);
 });
 
