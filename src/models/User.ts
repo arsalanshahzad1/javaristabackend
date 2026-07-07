@@ -20,8 +20,6 @@ export type UserRole =
 
 export interface IUser extends Document {
   name: string;
-  nickName?: string;
-  phone?: string;
   email: string;
   password: string;
   avatar?: string;
@@ -45,9 +43,6 @@ export interface IUser extends Document {
   lastComputedAt?: Date;
   lastComputeReason?: string;
   investorAccessLevel?: 'shareholder' | 'major_investor' | 'board';
-  source?: string;
-  createdAt?: Date;
-  updatedAt?: Date;
   reportsTo?: Types.ObjectId | null;
   directReports: Types.ObjectId[];
   hierarchyPath: Types.ObjectId[];
@@ -77,8 +72,6 @@ const USER_ROLES: UserRole[] = [
 const UserSchema = new Schema<IUser>(
   {
     name: { type: String, required: true, trim: true },
-    nickName: { type: String, trim: true },
-    phone: { type: String, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true, minlength: 8, select: false },
     avatar: { type: String },
@@ -105,7 +98,6 @@ const UserSchema = new Schema<IUser>(
       type: String,
       enum: ['shareholder', 'major_investor', 'board'],
     },
-    source: { type: String, trim: true },
     reportsTo: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     directReports: [{ type: Schema.Types.ObjectId, ref: 'User' }],
     hierarchyPath: [{ type: Schema.Types.ObjectId, ref: 'User' }],
