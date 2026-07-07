@@ -5,6 +5,62 @@ import { successResponse, errorResponse } from '../utils/response';
 import asyncHandler from '../utils/asyncHandler';
 import { INVESTINPATH } from '../config/paths';
 
+type SignupPayload = {
+  name: string;
+  nickName: string;
+  email: string;
+  password: string;
+  phone: string;
+};
+
+type InvestinSignupResponse = {
+  walletId?: string;
+  clabe?: string;
+};
+
+const createUser = async (payload: SignupPayload) => {
+  const user = await new User({
+    name: payload.name,
+    nickName: payload.nickName,
+    phone: payload.phone,
+    email: payload.email,
+    password: payload.password,
+    role: 'investor',
+    isPremium: true,
+    subscriptionStatus: 'active',
+    isVerified: true,
+    source: 'javarista',
+  }).save();
+
+  await User.findOneAndUpdate(
+    { email: user.email },
+    { $set: { isVerified: true } },
+    { new: true }
+  );
+
+  return user;
+};
+
+const syncUserToInvestin = async (payload: SignupPayload): Promise<InvestinSignupResponse> => {
+  const response = await fetch(`${INVESTINPATH}/register-javarista`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      first_name: payload.name,
+      last_name: payload.nickName,
+      email: payload.email,
+      password: payload.password,
+      phone_no: payload.phone,
+    }),
+  });
+
+  const responseData = await response.json();
+  console.log(responseData, 'investin registration response');
+  return responseData as InvestinSignupResponse;
+};
+
 export const register = asyncHandler(async (req: Request, res: Response) => {
   const name = req.body.name ?? req.body.first_name;
   const email = req.body.email;
@@ -12,6 +68,13 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
   const nickName = req.body.nickName ?? req.body.last_name ?? name;
   const phone = req.body.phone ?? req.body.phone_no ?? email;
   const normalizedEmail = String(email).trim().toLowerCase();
+  const signupPayload = {
+    name,
+    nickName,
+    email: normalizedEmail,
+    password,
+    phone,
+  };
 
   const existing = await User.findOne({ email: normalizedEmail });
   if (existing) {
@@ -19,41 +82,25 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
     return;
   }
 
-  const user = await User.create({
-    name,
-    nickName,
-    phone,
-    email: normalizedEmail,
-    password,
-    role: 'investor',
-    isPremium: true,
-    subscriptionStatus: 'active',
-    isVerified: true,
-    source: 'javarista',
-  });
+  const user = await createUser(signupPayload);
 
-  const data = {
-    first_name: name,
-    last_name: nickName,
-    email: normalizedEmail,
-    password,
-    phone_no: phone,
-  };
+  try {
+    const remoteResponse = await syncUserToInvestin(signupPayload);
+    const remoteWalletId = remoteResponse?.walletId ?? (remoteResponse as any)?.data?.walletId ?? (remoteResponse as any)?.data?.wallet;
+    const remoteClabe = remoteResponse?.clabe ?? (remoteResponse as any)?.data?.clabe;
 
-  fetch(`${INVESTINPATH}/register-javarista`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify(data),
-  })
-    .then((response) => response.json())
-    .then((response) => {
-      console.log(response, 'investin registration response');
-    })
-    .catch((error) => {
-      console.error('[auth.register] register-javarista failed:', error);
-    });
+    if (remoteWalletId) {
+      user.wallet = String(remoteWalletId);
+    }
+    if (remoteClabe) {
+      user.clabe = String(remoteClabe);
+    }
+    if (remoteWalletId || remoteClabe) {
+      await user.save({ validateBeforeSave: false });
+    }
+  } catch (error) {
+    console.error('[auth.register] register-javarista failed:', error);
+  }
 
   const accessToken = generateAccessToken(user._id.toString(), user.role);
   const refreshToken = generateRefreshToken(user._id.toString());
@@ -71,6 +118,8 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
       isPremium: user.isPremium,
       subscriptionStatus: user.subscriptionStatus,
       avatar: user.avatar,
+      wallet: user.wallet,
+      clabe: user.clabe,
     },
     accessToken,
     refreshToken,
