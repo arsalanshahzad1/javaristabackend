@@ -21,6 +21,7 @@ import communityRoutes from './routes/community.routes';
 import investorRoutes from './routes/investor.routes';
 import storeOpsRoutes from './routes/store-ops.routes';
 import roleManualRoutes from './routes/roleManual.routes';
+import internalRoutes from './routes/internal.routes';
 import metricsRoutes from './routes/metrics.routes';
 import employeeProfileRoutes from './routes/employeeProfile.routes';
 import uploadRoutes from './routes/upload.routes';
@@ -32,10 +33,12 @@ import enrollmentRoutes from './routes/enrollment.routes';
 import orgRoutes from './routes/org.routes';
 import regionDashboardRoutes from './routes/region-dashboard.routes';
 import employeeRoleRoutes from './routes/employeeRole.routes';
+import { validate } from './middleware/validate.middleware';
 import connectDB from './config/db';
 import rateLimit from 'express-rate-limit';
 import { startCertificationExpiryJob } from './jobs/certificationExpiry.job';
 import { startMissedChecklistJob } from './jobs/missed-checklist.job';
+import { registerSchema } from './validators/auth.validator';
 import { registerFundraiser } from './controllers/auth.controller';
 
 const app: Application = express();
@@ -80,7 +83,7 @@ const authLimiter = rateLimit({
 });
 
 app.use('/api/auth', authLimiter, authRoutes);
-app.post('/api/register-fundraiser', authLimiter, registerFundraiser);
+app.post('/api/register-fundraiser', authLimiter, validate(registerSchema), registerFundraiser);
 app.use('/api/users', userRoutes);
 app.use('/api/brew-methods', brewMethodRoutes);
 app.use('/api/recipes', recipeRoutes);
@@ -98,6 +101,7 @@ app.use('/api/community', communityRoutes);
 app.use('/api/investor', investorRoutes);
 app.use('/api/store-ops', storeOpsRoutes);
 app.use('/api/role-manuals', roleManualRoutes);
+app.use('/api/internal', internalRoutes);
 app.use('/api/metrics', metricsRoutes);
 app.use('/api/employees', employeeProfileRoutes);
 app.use('/api/upload', uploadRoutes);

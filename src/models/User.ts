@@ -26,8 +26,6 @@ export interface IUser extends Document {
   password: string;
   avatar?: string;
   bio?: string;
-  wallet?: string;
-  clabe?: string;
   role: UserRole;
   isVerified: boolean;
   isPremium: boolean;
@@ -85,8 +83,6 @@ const UserSchema = new Schema<IUser>(
     password: { type: String, required: true, minlength: 8, select: false },
     avatar: { type: String },
     bio: { type: String, maxlength: 160 },
-    wallet: { type: String },
-    clabe: { type: String },
     role: { type: String, enum: USER_ROLES, default: 'trainee' },
     isVerified: { type: Boolean, default: false },
     isPremium: { type: Boolean, default: false },
