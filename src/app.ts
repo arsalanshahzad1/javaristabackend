@@ -1,5 +1,7 @@
 import 'dotenv/config';
 import express, { Application, Request, Response } from 'express';
+import dns from "node:dns";
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { errorMiddleware } from './middleware/error.middleware';
@@ -38,6 +40,7 @@ import { startCertificationExpiryJob } from './jobs/certificationExpiry.job';
 import { startMissedChecklistJob } from './jobs/missed-checklist.job';
 
 const app: Application = express();
+
 
 app.use(helmet());
 
