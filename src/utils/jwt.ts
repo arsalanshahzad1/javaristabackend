@@ -11,7 +11,7 @@ export const generateAccessToken = (userId: string, role: UserRole): string => {
   return jwt.sign(
     { userId, role },
     process.env.JWT_SECRET as string,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '15m' } as jwt.SignOptions
+    { expiresIn: process.env.JWT_EXPIRES_IN || '1d' } as jwt.SignOptions
   );
 };
 
