@@ -6,7 +6,7 @@ import User from '../models/User';
 import CourseEnrollment from '../models/course-enrollment.model';
 import UserProgress from '../models/UserProgress';
 import ChecklistSchedule from '../models/ChecklistSchedule';
-import { computeAndSaveScore } from '../services/javarista-score.service';
+import { computeAndSaveScore, getScoreBreakdown } from '../services/javarista-score.service';
 
 const MANAGEMENT_ROLES = new Set([
   'shift_supervisor', 'store_manager', 'assistant_manager', 'area_manager',
@@ -92,6 +92,33 @@ export const getEmployeeProfile = asyncHandler(async (req: Request, res: Respons
       checklist: checklistCompliance,
     },
   });
+});
+
+// GET /api/employees/:userId/score
+export const getScore = asyncHandler(async (req: Request, res: Response) => {
+  const targetId = req.params['userId'] as string;
+  const requesterId = req.user!.userId;
+  const requesterRole = req.user!.role;
+
+  const isSelf = requesterId === targetId;
+  if (!isSelf && !isManagementOrAdmin(requesterRole)) {
+    errorResponse(res, 'Access denied', 403);
+    return;
+  }
+
+  if (!Types.ObjectId.isValid(targetId)) {
+    errorResponse(res, 'Invalid user ID', 400);
+    return;
+  }
+
+  const exists = await User.exists({ _id: targetId });
+  if (!exists) {
+    errorResponse(res, 'User not found', 404);
+    return;
+  }
+
+  const data = await getScoreBreakdown(targetId);
+  successResponse(res, 'Score fetched', data);
 });
 
 /**

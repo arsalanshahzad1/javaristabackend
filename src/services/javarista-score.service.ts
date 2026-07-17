@@ -18,10 +18,20 @@ import Certification from '../models/certification.model';
  * @param reason   - Short label describing what triggered this recompute
  * @returns The updated user document (with javaRistaScore, lastComputedAt, lastComputeReason set)
  */
-export async function computeAndSaveScore(
-  userId: string,
-  reason = 'manual'
-): Promise<IUser> {
+export interface ScoreBreakdownItem {
+  label: string;
+  points: number;
+  maxPoints: number;
+}
+
+interface ScoreComponents {
+  total: number;
+  breakdown: ScoreBreakdownItem[];
+}
+
+async function computeScoreComponents(
+  userId: string
+): Promise<{ user: IUser; components: ScoreComponents }> {
   const user = await User.findById(userId);
   if (!user) throw new Error(`User not found: ${userId}`);
 
@@ -65,10 +75,47 @@ export async function computeAndSaveScore(
 
   const total = Math.min(100, trainingScore + manualScore + checklistScore + certScore + readinessBonus);
 
-  user.javaRistaScore = total;
+  return {
+    user,
+    components: {
+      total,
+      breakdown: [
+        { label: 'Training', points: trainingScore, maxPoints: 30 },
+        { label: 'Manuals', points: manualScore, maxPoints: 20 },
+        { label: 'Checklists', points: checklistScore, maxPoints: 25 },
+        { label: 'Certifications', points: certScore, maxPoints: 15 },
+        { label: 'Promotion Readiness', points: readinessBonus, maxPoints: 10 },
+      ],
+    },
+  };
+}
+
+export async function computeAndSaveScore(
+  userId: string,
+  reason = 'manual'
+): Promise<IUser> {
+  const { user, components } = await computeScoreComponents(userId);
+
+  user.javaRistaScore = components.total;
   user.lastComputedAt = new Date();
   user.lastComputeReason = reason;
   await user.save();
 
   return user;
+}
+
+/** Read-only score breakdown for display — does not persist or change lastComputedAt/lastComputeReason. */
+export async function getScoreBreakdown(userId: string): Promise<{
+  total: number;
+  breakdown: ScoreBreakdownItem[];
+  lastComputedAt: Date | undefined;
+  lastComputeReason: string | undefined;
+}> {
+  const { user, components } = await computeScoreComponents(userId);
+  return {
+    total: components.total,
+    breakdown: components.breakdown,
+    lastComputedAt: user.lastComputedAt,
+    lastComputeReason: user.lastComputeReason,
+  };
 }
