@@ -35,6 +35,7 @@ import orgRoutes from './routes/org.routes';
 import regionDashboardRoutes from './routes/region-dashboard.routes';
 import employeeRoleRoutes from './routes/employeeRole.routes';
 import favoriteRoutes from './routes/favorite.routes';
+import collectionRoutes from './routes/collection.routes';
 import connectDB from './config/db';
 import rateLimit from 'express-rate-limit';
 import { startCertificationExpiryJob } from './jobs/certificationExpiry.job';
@@ -112,6 +113,7 @@ app.use('/api/org', orgRoutes);
 app.use('/api/regions', regionDashboardRoutes);
 app.use('/api/employee-roles', employeeRoleRoutes);
 app.use('/api/favorites', favoriteRoutes);
+app.use('/api/collections', collectionRoutes);
 
 app.use(errorMiddleware);
 
