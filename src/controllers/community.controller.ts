@@ -19,6 +19,16 @@ import { createNotification } from '../services/notification.service';
 
 const toOid = (id: string) => new mongoose.Types.ObjectId(id);
 
+// ─── Badge catalog ────────────────────────────────────────────────────────────
+
+export const getBadgeCatalog = asyncHandler(async (_req: Request, res: Response) => {
+  const badges = Object.entries(BADGE_DEFINITIONS).map(([badgeId, def]) => ({
+    badgeId,
+    ...def,
+  }));
+  successResponse(res, 'Badge catalog fetched', badges);
+});
+
 // ─── Public Profiles ─────────────────────────────────────────────────────────
 
 export const getPublicProfile = asyncHandler(async (req: Request, res: Response) => {

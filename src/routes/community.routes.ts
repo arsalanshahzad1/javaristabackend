@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import {
+  getBadgeCatalog,
   getPublicProfile,
   getMyProfile,
   updateMyProfile,
@@ -27,6 +28,7 @@ import { adminMiddleware } from '../middleware/admin.middleware';
 const router = Router();
 
 // ─── Public ───────────────────────────────────────────────────────────────────
+router.get('/badges', getBadgeCatalog);
 router.get('/users/:userId/profile', getPublicProfile);
 router.get('/explore', optionalAuth, getExplore);
 router.get('/leaderboard', getLeaderboard);

@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { authMiddleware } from '../middleware/auth.middleware';
 import Store from '../models/Store';
 import User from '../models/User';
+import { successResponse } from '../utils/response';
 import {
   getRegionOverview,
   getRegionStoreBreakdown,
@@ -73,7 +74,7 @@ async function requireRegionAccess(req: Request, res: Response, next: NextFuncti
 router.get('/', authMiddleware, async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const regionIds = await Store.distinct('regionId', { regionId: { $ne: null } });
-    res.json(regionIds);
+    successResponse(res, 'Regions fetched', regionIds);
   } catch (err) {
     next(err);
   }
@@ -95,7 +96,7 @@ router.get(
         qs(req.query.to)
       );
       const data = await getRegionOverview(regionId, dateRange);
-      res.json(data);
+      successResponse(res, 'Region overview fetched', data);
     } catch (err) {
       next(err);
     }
@@ -118,7 +119,7 @@ router.get(
         qs(req.query.to)
       );
       const data = await getRegionStoreBreakdown(regionId, dateRange);
-      res.json(data);
+      successResponse(res, 'Region stores fetched', data);
     } catch (err) {
       next(err);
     }
@@ -141,7 +142,7 @@ router.get(
         qs(req.query.to)
       );
       const data = await getRegionScoreTrend(regionId, dateRange);
-      res.json(data);
+      successResponse(res, 'Region trend fetched', data);
     } catch (err) {
       next(err);
     }
@@ -163,7 +164,7 @@ router.get(
       const rawLimit = parseInt(qs(req.query.limit) ?? '', 10);
       const limit = isNaN(rawLimit) ? 10 : Math.min(rawLimit, 50);
       const data = await getRegionTopPerformers(regionId, limit);
-      res.json(data);
+      successResponse(res, 'Region top performers fetched', data);
     } catch (err) {
       next(err);
     }

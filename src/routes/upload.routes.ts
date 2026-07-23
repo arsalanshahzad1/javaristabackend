@@ -13,7 +13,7 @@ import {
   uploadChecklistPhoto,
   uploadCertificationBadge,
   uploadAvatar,
-} from '../config/cloudinary';
+} from '../config/upload';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { adminMiddleware } from '../middleware/admin.middleware';
 

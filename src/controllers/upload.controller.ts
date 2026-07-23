@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import asyncHandler from '../utils/asyncHandler';
 import { successResponse, errorResponse } from '../utils/response';
-import { cloudinary } from '../config/cloudinary';
+import { toAbsoluteUrl, removeUpload } from '../config/upload';
 import User from '../models/User';
 
 export const uploadRecipePhoto = asyncHandler(async (req: Request, res: Response) => {
@@ -10,7 +10,7 @@ export const uploadRecipePhoto = asyncHandler(async (req: Request, res: Response
     return;
   }
   successResponse(res, 'Photo uploaded', {
-    url: req.file.path,
+    url: toAbsoluteUrl(req, req.file.path),
     publicId: req.file.filename,
   });
 });
@@ -22,7 +22,7 @@ export const uploadPlaybookMedia = asyncHandler(async (req: Request, res: Respon
   }
   const type = req.file.mimetype === 'application/pdf' ? 'pdf' : 'image';
   successResponse(res, 'File uploaded', {
-    url: req.file.path,
+    url: toAbsoluteUrl(req, req.file.path),
     publicId: req.file.filename,
     type,
     originalName: req.file.originalname,
@@ -35,7 +35,7 @@ export const uploadChecklistPhoto = asyncHandler(async (req: Request, res: Respo
     return;
   }
   successResponse(res, 'Photo uploaded', {
-    url: req.file.path,
+    url: toAbsoluteUrl(req, req.file.path),
     publicId: req.file.filename,
   });
 });
@@ -46,7 +46,7 @@ export const uploadCertificationBadge = asyncHandler(async (req: Request, res: R
     return;
   }
   successResponse(res, 'Badge uploaded', {
-    url: req.file.path,
+    url: toAbsoluteUrl(req, req.file.path),
     publicId: req.file.filename,
   });
 });
@@ -57,25 +57,28 @@ export const uploadAvatar = asyncHandler(async (req: Request, res: Response) => 
     return;
   }
 
+  const url = toAbsoluteUrl(req, req.file.path);
   const userId = req.user?.userId;
   if (userId) {
-    await User.findByIdAndUpdate(userId, { avatar: req.file.path });
+    await User.findByIdAndUpdate(userId, { avatar: url });
   }
 
   successResponse(res, 'Avatar uploaded', {
-    url: req.file.path,
+    url,
     publicId: req.file.filename,
   });
 });
 
 export const deleteUpload = asyncHandler(async (req: Request, res: Response) => {
-  // publicId captured from wildcard route, e.g. "javarista/recipes/abc123"
-  const publicId = (req.params as Record<string, string>)['path'];
+  // publicId captured from wildcard route, e.g. "javarista/recipes/abc123".
+  // Express's named wildcard (/*path) yields an array of segments, not a joined string.
+  const rawPath = (req.params as Record<string, string | string[]>)['path'];
+  const publicId = Array.isArray(rawPath) ? rawPath.join('/') : rawPath;
   if (!publicId) {
     errorResponse(res, 'publicId is required', 400);
     return;
   }
 
-  await cloudinary.uploader.destroy(publicId);
+  await removeUpload(publicId);
   successResponse(res, 'File deleted', { deleted: true });
 });

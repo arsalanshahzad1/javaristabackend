@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express, { Application, Request, Response } from 'express';
+import path from 'path';
 import dns from "node:dns";
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
 import helmet from 'helmet';
@@ -76,6 +77,16 @@ app.use(express.urlencoded({ extended: true }));
 app.get('/api/health', (_req: Request, res: Response) => {
   res.status(200).json({ success: true, message: 'JavaRista API running' });
 });
+
+// Serves files saved by the local-disk upload fallback (used when Cloudinary isn't configured).
+app.use(
+  '/uploads',
+  (_req: Request, res: Response, next) => {
+    res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+    next();
+  },
+  express.static(path.join(process.cwd(), 'uploads'))
+);
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
